@@ -6,7 +6,10 @@ defmodule Awsex.HttpMacros do
 
   defmacro __using__(_) do
     endpoint_prefix = get_endpoint_prefix(@api_spec)
-    aws_host = "https://#{endpoint_prefix}.us-east-1.amazonaws.com"
+    region = "us-east-1"
+    service_name = "DataPipeline"
+    aws_host = "https://#{endpoint_prefix}.#{region}.amazonaws.com"
+    # key = Awsex.Auth.auth_params |> Map.get("secret_access_key")
 
     for operation_name <- operation_names(@api_spec) do
       request_uri =
@@ -20,17 +23,21 @@ defmodule Awsex.HttpMacros do
 
       quote do
         def unquote(def_name)(values) do
-          headers = [
-            {"X-Amz-Target", "DataPipeline.ActivatePipeline"}#,
-            # {Authorization: AuthParams}
-          ]
+          # headers = [
+          #   {"X-Amz-Target", "DataPipeline.#{unquote(operation_name)}"},
+          #   {"Content-Type", "application/x-amz-json-1.1"},
+          #   {"X-Amz-Date", Awsex.Auth.iso8601},
+          #   {"Authorization", Awsex.Auth.auth_params}
 
-          HTTPoison.post(
-            unquote(aws_host <> "/" <> request_uri),
-            {:form, values},
-            %{"Content-type" => "application/x-www-form-urlencoded"},
-            headers
-          )
+
+          #   # {Authorization: AuthParams}
+          # ]
+
+          # HTTPoison.post(
+          #   unquote(aws_host <> "/" <> request_uri),
+          #   {:form, values},
+          #   headers
+          # )
         end
       end
     end

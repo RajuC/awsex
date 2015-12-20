@@ -11,12 +11,13 @@ defmodule Awsex.Mixfile do
   end
 
   def application do
-    [applications: [:logger, :httpoison, :poison],
+    [applications: [:logger, :httpoison, :poison, :crypto, :tzdata],
      mod: {Awsex, []}]
   end
 
   defp deps do
     [{:httpoison, "~> 0.7"},
-     {:poison, "~> 1.5"}]
+     {:poison, "~> 1.5"},
+     {:timex, "~> 1.0-rc"}]
   end
 end

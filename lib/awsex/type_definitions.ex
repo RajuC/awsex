@@ -11,7 +11,7 @@ defmodule Awsex.TypeDefinitions do
     # define module
 
     {shape_name, _shape_value} = shape
-    name = Module.concat([Awsex, String.to_atom(shape_name)])
+    name = Module.concat([Awsex, prefix, String.to_atom(shape_name)])
     fields = shape_to_types(shape)
 
     contents = quote do
@@ -66,6 +66,10 @@ defmodule Awsex.TypeDefinitions do
 
   def shapes do
     deep_fetch!(@api_spec, ["shapes"])
+  end
+
+  def prefix do
+    deep_fetch!(@api_spec, ["metadata", "targetPrefix"])
   end
 
   def operations do

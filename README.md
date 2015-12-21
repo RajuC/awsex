@@ -10,7 +10,7 @@ Generates functions and structs from the AWS API json spec.
 
 ## Todo
 
-- Authentication
-- Tests
-- Actual use
-- Compile-time generation of typespecs (if this is even possible)
+- [x] Authentication
+- [ ] Tests
+- [ ] Actual use
+- [ ] Compile-time generation of typespecs (if this is even possible)

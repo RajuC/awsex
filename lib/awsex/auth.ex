@@ -1,5 +1,5 @@
 defmodule Awsex.Auth do
-  alias Timex.Date
+  require Timex
   alias Timex.DateFormat
 
   @moduledoc """
@@ -217,13 +217,13 @@ defmodule Awsex.Auth do
   end
 
   defp create_today_datestamp do
-    Date.universal
-    |> DateFormat.format!("%Y%m%d", :strftime)
+    Timex.DateTime.universal
+    |> Timex.format!("%Y%m%d", :strftime)
   end
 
   defp create_today_timestamp do
-    Date.universal
-    |> DateFormat.format!("%Y%m%dT%H%M%SZ", :strftime)
+    Timex.DateTime.universal
+    |> Timex.format!("%Y%m%dT%H%M%SZ", :strftime)
   end
 
   defp hash(value) do

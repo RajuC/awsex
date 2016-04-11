@@ -4,7 +4,7 @@ defmodule Awsex.Mixfile do
   def project do
     [app: :awsex,
      version: "0.0.1",
-     elixir: "~> 1.1",
+     elixir: "~> 1.2",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
      deps: deps]
@@ -16,8 +16,9 @@ defmodule Awsex.Mixfile do
   end
 
   defp deps do
-    [{:httpoison, "~> 0.7"},
-     {:poison, "~> 1.5"},
-     {:timex, "~> 1.0-rc"}]
+    [{:httpoison, "~> 0.8"},
+     {:poison, "~> 2.1"},
+     {:timex, "~> 2.1"},
+     {:ex_doc, "~> 0.11", only: :dev}]
   end
 end

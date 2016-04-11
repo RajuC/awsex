@@ -42,7 +42,6 @@ defmodule AuthTest do
     ]
     hashed_payload = Auth.hash_body(query_string)
 
-
     expected_req = "POST\n/\n\ncontent-type:application/x-www-form-urlencoded; charset=utf-8\nx-amz-date:20110909T233600Z\n\ncontent-type;x-amz-date\n#{hashed_payload}"
 
     assert Auth.canonical_request(request_method, uri, query_string, headers) == expected_req

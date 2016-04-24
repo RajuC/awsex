@@ -2,16 +2,6 @@ defmodule AuthTest do
   use ExUnit.Case
   alias Awsex.Auth
 
-  test "it gets auth information from the environment" do
-    System.put_env("AWS_ACCESS_KEY_ID", "FOO")
-    System.put_env("AWS_SECRET_ACCESS_KEY", "BAR")
-
-    keys = Auth.keys
-
-    assert Map.fetch!(keys, "access_key_id") == "FOO"
-    assert Map.fetch!(keys, "secret_access_key") == "BAR"
-  end
-
   test "create_signing_key" do
     # from: http://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html
 
@@ -37,12 +27,12 @@ defmodule AuthTest do
     uri = "https://iam.amazonaws.com/"
     query_string = "Action=ListUsers&Version=2010-05-08"
     headers = [
-      {"content-type", "application/x-www-form-urlencoded; charset=utf-8"},
+      {"content-type", "application/x-amz-json-1.1"},
       {"x-amz-date", "20110909T233600Z"}
     ]
-    hashed_payload = Auth.hash_body(query_string)
+    hashed_payload = Auth.hash(query_string)
 
-    expected_req = "POST\n/\n\ncontent-type:application/x-www-form-urlencoded; charset=utf-8\nx-amz-date:20110909T233600Z\n\ncontent-type;x-amz-date\n#{hashed_payload}"
+    expected_req = "POST\n/\n\ncontent-type:application/x-amz-json-1.1\nx-amz-date:20110909T233600Z\n\ncontent-type;x-amz-date\n#{hashed_payload}"
 
     assert Auth.canonical_request(request_method, uri, query_string, headers) == expected_req
   end
@@ -52,14 +42,14 @@ defmodule AuthTest do
 
     headers = [
       {"Host", "iam.amazonaws.com"},
-      {"Content-Type", "application/x-www-form-urlencoded; charset=utf-8"},
+      {"content-type", "application/x-amz-json-1.1"},
       {"My-header1", "a   b   c "},
       {"X-Amz-Date", "20150830T123600Z"},
       {"My-header2", "\"a   b   c\""},
     ]
 
     expected = """
-    content-type:application/x-www-form-urlencoded; charset=utf-8
+    content-type:application/x-amz-json-1.1
     host:iam.amazonaws.com
     my-header1:a b c
     my-header2:"a   b   c"
@@ -73,7 +63,7 @@ defmodule AuthTest do
     # https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
     headers = [
       {"Host", "iam.amazonaws.com"},
-      {"Content-Type", "application/x-www-form-urlencoded; charset=utf-8"},
+      {"content-type", "application/x-amz-json-1.1"},
       {"My-header1", "a   b   c "},
       {"X-Amz-Date", "20150830T123600Z"},
       {"My-header2", "\"a   b   c\""}
@@ -92,14 +82,14 @@ defmodule AuthTest do
     today_timestamp = "20110909T233600Z"
     today_datestamp = "20110909"
     headers = [
-      {"content-type", "application/x-www-form-urlencoded; charset=utf-8"},
+      {"content-type", "application/x-amz-json-1.1"},
       {"x-amz-date", today_timestamp}
     ]
     region = "us-east-1"
     service = "datapipeline"
     credential_scope = Auth.credential_scope(today_datestamp, region, service)
     canonical_request = Auth.canonical_request(request_method, uri, query_string, headers)
-    hashed_canonical_request = Auth.hash_canonical_request(canonical_request)
+    hashed_canonical_request = Auth.hash(canonical_request)
 
     expected = [
       "AWS4-HMAC-SHA256",

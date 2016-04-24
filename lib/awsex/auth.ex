@@ -1,6 +1,5 @@
 defmodule Awsex.Auth do
   require Timex
-  alias Timex.DateFormat
 
   @moduledoc """
   Sign requests
@@ -10,25 +9,32 @@ defmodule Awsex.Auth do
 
   @hash_algorithm "AWS4-HMAC-SHA256"
 
-  @spec main(map(), String.t, String.t) :: map()
-  def main(body_params, region, service) do
-    access_key_id     = keys["access_key_id"]
-    secret_access_key = keys["secret_access_key"]
+  @spec main(%Awsex.Client{}, map(), map()) :: map()
+  def main(creds, body_params, metadata) do
+    access_key_id     = creds.access_key_id
+    secret_access_key = creds.secret_access_key
+    region            = creds.region
+
+    endpoint_prefix = Map.fetch!(metadata, "endpointPrefix")
+    target_prefix   = Map.fetch!(metadata, "targetPrefix")
+
 
     today_datestamp = create_today_datestamp
     today_timestamp = create_today_timestamp
 
+    action = Map.fetch!(body_params, "action")
+    body = Map.delete(body_params, "action") |> Poison.encode!
+
     headers = [
-      {"host", "#{service}.#{region}.amazonaws.com"},
-      {"content-type", "application/x-www-form-urlencoded; charset=utf-8"},
-      {"x-amz-date", today_timestamp}
+      {"host", "#{endpoint_prefix}.#{region}.amazonaws.com"},
+      {"content-type", "application/x-amz-json-1.1"},
+      {"x-amz-date", today_timestamp},
+      {"x-amz-target", "#{target_prefix}.#{action}"}
     ]
 
-    body = create_url_params(body_params)
-
     canonical_request = canonical_request(
-      "POST",
-      "https://#{service}.#{region}.amazonaws.com/",
+      "POST", # TODO parameterize
+      "https://#{endpoint_prefix}.#{region}.amazonaws.com/",
       body,
       headers
     )
@@ -40,14 +46,14 @@ defmodule Awsex.Auth do
       today_datestamp,
       today_timestamp,
       region,
-      service
+      endpoint_prefix
     )
 
     signing_key = create_signing_key(
       secret_access_key,
       today_datestamp,
       region,
-      service
+      endpoint_prefix
     )
 
     signed_request = sign_request(signing_key, string_to_sign)
@@ -58,11 +64,11 @@ defmodule Awsex.Auth do
       today_datestamp,
       headers,
       region,
-      service
+      endpoint_prefix
     )
 
     %{
-      "host"              => "https://#{service}.#{region}.amazonaws.com/",
+      "host"              => "https://#{endpoint_prefix}.#{region}.amazonaws.com/",
       "body"              =>  body,
       "headers"           => [auth_header | headers],
       "string_to_sign"    => string_to_sign,
@@ -87,30 +93,19 @@ defmodule Awsex.Auth do
   HexEncode(Hash(RequestPayload))
   """
   @spec canonical_request(String.t, String.t, String.t, headers()) :: String.t
-  def canonical_request(request_method, uri, body, headers) do
+  def canonical_request(request_method, _uri, body, headers) do
     combined_headers  = headers
     canonical_headers = canonical_headers(combined_headers)
     sign_headers      = sign_headers(combined_headers)
-    hashed_payload    = hash_body(body)
+    hashed_payload    = hash(body)
 
-    request =
       [
         request_method,
-        "/" <> "\n",
+        "/" <> "\n", # TODO parameterize
         canonical_headers,
         sign_headers,
         hashed_payload,
       ] |> Enum.join("\n")
-  end
-
-  @spec hash_canonical_request(String.t) :: String.t
-  def hash_canonical_request(canonical_request) do
-    hash(canonical_request)
-  end
-
-  @spec hash_body(String.t) :: String.t
-  def hash_body(body) do
-    hash(body)
   end
 
   @doc """
@@ -124,9 +119,10 @@ defmodule Awsex.Auth do
   @spec canonical_headers(headers()) :: String.t
   def canonical_headers(headers) do
     downcase_and_sort(headers)
-    |> Enum.map(
-      fn({hname, hvalue}) -> "#{hname}:#{strip_multiple_spaces(hvalue)}\n" end)
-    |> Enum.join
+    |> Enum.map_join(
+      fn({hname, hvalue}) ->
+        "#{hname}:#{strip_multiple_spaces(hvalue)}\n"
+      end)
   end
 
   @doc """
@@ -180,21 +176,6 @@ defmodule Awsex.Auth do
     |> hmac256("aws4_request")
   end
 
-  @doc """
-  Get AWS credentials
-
-  Set at AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables
-  """
-  @spec keys() :: map()
-  def keys do
-    access_key_id = System.get_env("AWS_ACCESS_KEY_ID")
-    secret_access_key = System.get_env("AWS_SECRET_ACCESS_KEY")
-
-    %{
-      "access_key_id"     => access_key_id,
-      "secret_access_key" => secret_access_key
-    }
-  end
 
   defp auth_header(signature, access_key_id, datestamp, headers, region, service) do
     authorization  = @hash_algorithm
@@ -202,10 +183,6 @@ defmodule Awsex.Auth do
     credential     = credential(access_key_id, datestamp, region, service)
 
     {"Authorization", "#{authorization} Credential=#{credential}, SignedHeaders=#{signed_headers}, Signature=#{signature}"}
-  end
-
-  defp create_url_params(body) do
-    Enum.map_join(body, "&", fn({k, v}) -> "#{k}=#{v}" end)
   end
 
   defp strip_multiple_spaces(str) do
@@ -226,7 +203,7 @@ defmodule Awsex.Auth do
     |> Timex.format!("%Y%m%dT%H%M%SZ", :strftime)
   end
 
-  defp hash(value) do
+  def hash(value) do
     :crypto.hash(:sha256, value) |> Base.encode16 |> String.downcase
   end
 

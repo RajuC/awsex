@@ -1,4 +1,9 @@
 defmodule Awsex.Ops do
+  @moduledoc """
+  At compile time: generates modules and functions
+  to access the functionality described in a given
+  JSON API specification.
+  """
   alias Awsex.Auth
   require Poison
 
@@ -9,37 +14,54 @@ defmodule Awsex.Ops do
     end
   end
 
+  @spec module(%{String.t => String.t}) :: module()
   def module(desc) do
-    module_name = desc |> metadata |> target_prefix |> String.to_atom
-    module_contents = operations(desc) |> Enum.map(&to_def/1)
+    metadata = metadata(desc)
+    module_name = metadata |> target_prefix |> String.to_atom
+    module_contents =
+      desc
+      |> operations
+      |> Enum.map(fn(operation) ->
+           to_def(operation, metadata)
+         end)
+    service_documentation = quote do
+      @moduledoc Map.fetch!(unquote(Macro.escape(desc)), "documentation")
+    end
 
     Module.create(
       Module.concat([Awsex, module_name]),
-      module_contents,
+      [service_documentation|module_contents],
       Macro.Env.location(__ENV__)
     )
   end
 
-  def to_def({fn_name, operation}) do
+  @spec to_def({String.t, %{String.t => String.t}}, %{String.t => String.t}) :: any()
+  def to_def({fn_name, operation}, meta) do
+    doc = Map.fetch!(operation, "documentation")
+
     quote do
-      def unquote(String.to_atom(fn_name))(client, input, options \\ []) do
+      @doc """
+      #{unquote(doc)}
+      """
+      def unquote(String.to_atom(fn_name))(client, request_params) do
         auth = Auth.main(
+          client,
           Map.put_new(
-            input,
-            "Action", Macro.camelize(unquote(fn_name))
+            request_params,
+            "action", Macro.camelize(unquote(fn_name))
           ),
-          "us-east-1",
-          "datapipeline"
+          # Maps are not valid quoted expressions and must be escaped,
+          # see: http://elixir-lang.org/getting-started/meta/quote-and-unquote.html#escaping
+          unquote(Macro.escape(meta))
         )
 
-        IO.inspect(auth)
-
-        HTTPoison.post!(
-          # "https://datapipeline.us-east-1.amazonaws.com",
-          Map.get(auth, "host"),
-          Map.get(auth, "body"),
-          Map.get(auth, "headers")
+        response = HTTPoison.post!(
+          Map.fetch!(auth, "host"),
+          Map.fetch!(auth, "body"),
+          Map.fetch!(auth, "headers")
         )
+
+        Map.put(response, :body, Poison.decode!(response.body))
       end
     end
   end
@@ -68,6 +90,10 @@ defmodule Awsex.Ops do
 end
 
 defmodule Awsex.Ops.Real do
+  @moduledoc """
+  This module provides a separate compilation unit to force the evaluation
+  of the macros in Awsex.Ops
+  """
   require Awsex.Ops
   @before_compile Awsex.Ops
 end
